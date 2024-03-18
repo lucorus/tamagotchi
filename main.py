@@ -36,6 +36,23 @@ async def games(message: Message):
     )
 
 
+@dp.callback_query(F.data == 'games')
+async def get_games(callback: CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(
+        text="Угадай число",
+        callback_data="guess_number")
+    )
+    builder.add(types.InlineKeyboardButton(
+        text="Города",
+        callback_data="towns")
+    )
+    await callback.message.answer(
+        "В какую игру хочешь сыграть?",
+        reply_markup=builder.as_markup()
+    )
+
+
 @dp.callback_query(F.data == "guess_number")
 async def start_game_guess_number(callback: CallbackQuery):
     game_data[callback.from_user.id] = ['guess_number', random.randint(1, 100)]
@@ -67,24 +84,24 @@ async def create_pet(message: Message):
         await message.answer(f'Вы ввели некорректное имя')
 
 
-@dp.message(Command('feed'))
-async def feed_pet(message: Message):
+@dp.callback_query(F.data == 'feed')
+async def feed_pet(callback: CallbackQuery):
     try:
-        base.feed_pet(cursor, message.from_user.id)
-        await message.answer('Питомец накормлен!')
+        base.feed_pet(cursor, callback.from_user.id)
+        await callback.message.answer('Питомец накормлен!')
     except Exception as ex:
-        await message.answer('Произошла неизвестная ошибка')
+        await callback.message.answer('Произошла неизвестная ошибка')
         print(ex)
 
 
 # на данные момент в магазине есть только корм, но потом добавится ещё что-нибудь
-@dp.message(Command('assortment'))
-async def get_assortment(message: Message):
+@dp.callback_query(F.data == 'assortment')
+async def get_assortment(callback: CallbackQuery):
     builder = InlineKeyboardBuilder().add(types.InlineKeyboardButton(
         text="Купить корм за 1 🪙",
         callback_data="buy_food")
     )
-    await message.answer(f"Ассортимент:", reply_markup=builder.as_markup())
+    await callback.message.answer(f"Ассортимент:", reply_markup=builder.as_markup())
 
 
 @dp.callback_query(F.data == 'buy_food')
@@ -120,10 +137,38 @@ async def command_start_handler(message: Message) -> None:
     await message.answer(f"Привет, { message.from_user.full_name }!", reply_markup=builder.as_markup())
 
 
-@dp.message(Command('pet_info'))
+@dp.message(Command('info'))
 async def get_pet_info(message: Message):
-    await message.answer(f'Информация о вашем питомце: \n'
-                         f' { base.get_pet_info(cursor, message.from_user.id) }')
+    pet_info = base.get_pet_info(cursor, message.from_user.id)
+    if pet_info[2] == None:
+        # если питомца ещё нет, то предлагаем его создать
+        builder = InlineKeyboardBuilder().add(types.InlineKeyboardButton(
+            text="Создать питомца",
+            callback_data="create_pet")
+        )
+        await message.answer('У вас ещё нет питомца', reply_markup=builder.as_markup())
+    else:
+        builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(
+            text="Игры",
+            callback_data="games")
+        )
+
+        builder.add(types.InlineKeyboardButton(
+            text="Магазин",
+            callback_data="assortment")
+        )
+
+        builder.add(types.InlineKeyboardButton(
+            text="Покормить",
+            callback_data="feed")
+        )
+        await message.answer(
+            f'''
+            { pet_info[6] } \n Еда: {pet_info[7]} / {pet_info[9]} \n Настроение: {pet_info[8]} / { pet_info[10]} \n Количество корма: { pet_info[1] } \n Монет: { pet_info[4] }🪙
+            ''',
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.message(Command('get_admin_status'))
@@ -134,10 +179,19 @@ async def get_admin_status(message: Message):
         await message.delete()
 
 
+# рассылает сообщения пользователям с информацией о смерти их питомца :(
+async def send_message(user_id: list) -> None:
+    for item in user_id:
+        await bot.send_message(chat_id=item[0], text='Ваш питомец погиб 😢😢😢')
+        base.delete_pet(cursor, item[0])
+
+
 # функция, которая раз в 4 часа уменьшает сытость и настроение питомцев
 async def change_count_food_and_mood():
     while True:
         base.change_count_food_and_mood(cursor)
+        users = base.check_pet_stats(cursor)
+        await send_message(users)
         await asyncio.sleep(60 * 60 * 4)
 
 
