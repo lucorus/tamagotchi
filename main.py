@@ -1,9 +1,6 @@
 import asyncio
 import logging
-import sqlite3
 import sys
-
-import emoji
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -11,16 +8,10 @@ from emoji import emojize
 
 import admin
 import base
-import config
-from aiogram import Bot, Dispatcher, types, F
+from base import dp, bot, cursor
+from aiogram import types, F
 import random
 import games as game
-
-dp = Dispatcher()
-global connection, cursor, bot
-connection = sqlite3.connect('files.db', check_same_thread=True)
-cursor = connection.cursor()
-bot = Bot(config.token)
 
 
 @dp.callback_query(F.data == 'games')
@@ -64,7 +55,7 @@ async def pre_create_pet(callback: CallbackQuery):
 async def create_pet(message: Message):
     try:
         name = message.text.split()[0].replace('/', '').capitalize()
-        base.create_pet(cursor, message.from_user.id, name)
+        base.create_pet(message.from_user.id, name)
         game.game_data.pop(message.from_user.id)
         await message.answer(f'Питомец с именем {name} создан')
     except:
@@ -74,7 +65,7 @@ async def create_pet(message: Message):
 @dp.callback_query(F.data == 'feed')
 async def feed_pet(callback: CallbackQuery):
     try:
-        base.feed_pet(cursor, callback.from_user.id)
+        base.feed_pet(callback.from_user.id)
         await callback.message.answer('Питомец накормлен!')
     except Exception as ex:
         await callback.message.answer('Произошла неизвестная ошибка')
@@ -85,7 +76,7 @@ async def feed_pet(callback: CallbackQuery):
 @dp.callback_query(F.data == 'assortment')
 async def get_assortment(callback: CallbackQuery):
     builder = InlineKeyboardBuilder().add(types.InlineKeyboardButton(
-        text="Купить корм за 1 🪙",
+        text="Купить корм за 2 🪙",
         callback_data="buy_food")
     )
     await callback.message.answer(f"Ассортимент:", reply_markup=builder.as_markup())
@@ -94,8 +85,9 @@ async def get_assortment(callback: CallbackQuery):
 @dp.callback_query(F.data == 'buy_food')
 async def buy_food(callback: CallbackQuery):
     try:
-        if base.get_pet_info(cursor, callback.from_user.id)[4] >= 1:
-            base.buy_food(cursor, callback.from_user.id)
+        food_price = 2
+        if base.get_pet_info(callback.from_user.id)[4] >= food_price:
+            base.buy_food(callback.from_user.id, food_price)
             await callback.message.answer('Корм успешно куплен')
         else:
             await callback.message.answer('У вас недостаточно 🪙')
@@ -117,7 +109,7 @@ async def command_start_handler(message: Message) -> None:
 
 @dp.message(Command('info'))
 async def get_pet_info(message: Message):
-    pet_info = base.get_pet_info(cursor, message.from_user.id)
+    pet_info = base.get_pet_info(message.from_user.id)
     builder = InlineKeyboardBuilder()
     if pet_info[2] == None:
         # если питомца ещё нет, то предлагаем его создать
@@ -149,29 +141,18 @@ async def get_pet_info(message: Message):
         )
 
 
-# пользователь/админ вводит команду /admin_panel *команда администратора, которую он хочет использовать*
-@dp.message(Command('admin_panel'))
-async def admin_panel(message: Message):
-    # получаем название команды администратора
-    match message.text.split()[1]:
-        case 'send_message':
-            pass
-        case 'get_admin_permissions':
-            await admin.get_admin_permissions(message, cursor)
-
-
 # рассылает сообщения пользователям с информацией о смерти их питомца :(
 async def send_message(user_id: list) -> None:
     for item in user_id:
         await bot.send_message(chat_id=item[0], text=emojize('Ваш питомец погиб:anxious_face_with_sweat:'))
-        base.delete_pet(cursor, item[0])
+        base.delete_pet(item[0])
 
 
 # функция, которая раз в 4 часа уменьшает сытость и настроение питомцев
 async def change_count_food_and_mood():
     while True:
-        base.change_count_food_and_mood(cursor)
-        users = base.check_pet_stats(cursor)
+        base.change_count_food_and_mood()
+        users = base.check_pet_stats()
         await send_message(users)
         await asyncio.sleep(60 * 60 * 4)
 
@@ -179,12 +160,15 @@ async def change_count_food_and_mood():
 @dp.message()
 async def messages(message: types.Message):
     try:
-        if game.game_data[message.from_user.id][0] == 'guess_number':
-            await game.guess_number(message)
-        elif game.game_data[message.from_user.id][0] == 'create_pet':
-            await create_pet(message)
-        elif game.game_data[message.from_user.id][0] == 'towns':
-            await game.game_towns(message)
+        match game.game_data[message.from_user.id][0]:
+            case 'guess_number':
+                await game.guess_number(message)
+            case 'create_pet':
+                await create_pet(message)
+            case 'towns':
+                await game.game_towns(message)
+            case 'send_message':
+                await admin.send_public_message(message)
     except:
         # пользователь не играет ни в какую игру
         pass
