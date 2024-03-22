@@ -32,7 +32,7 @@ async def admin_panel(message: Message):
 @dp.message(Command('get_admin_permissions'))
 async def get_admin_permissions(message: Message):
     if message.text.split()[1] == config.password:
-        base.give_admin_status(message.from_user.id)
+        base.give_admin_permissions(message.from_user.id)
         await message.answer('Права администратора получены!')
         await message.delete()
     else:
@@ -79,7 +79,7 @@ async def pre_send_public_message(callback: CallbackQuery):
     await callback.message.answer('Введите текст сообщения, которое вы хотите отправить')
 
 
-# отправляет сообщение всем пользователям
+# отправляет сообщение всем пользователям с текстом, написанным админом
 async def send_public_message(message: Message):
     game_data.pop(message.from_user.id)
     if message.media_group_id != None:

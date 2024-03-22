@@ -2,6 +2,7 @@ import uuid
 import sqlite3
 import config
 from aiogram import Bot, Dispatcher
+from aiogram.client.session.aiohttp import AiohttpSession
 
 # Словарь, который хранит данные о всех активных действиях пользователей
 # {user_id: ['название_действия', данные, которые нужны для данного действия/ничего], }
@@ -10,29 +11,23 @@ dp = Dispatcher()
 global cursor, bot
 connection = sqlite3.connect('files.db', check_same_thread=True)
 cursor = connection.cursor()
+# session = AiohttpSession(proxy=config.PROXY_URL)
+# bot = Bot(token=config.token, session=session)
 bot = Bot(config.token)
 
 
-def feed_pet(user_id: int) -> None:
-    pet = get_pet_info(user_id)
-    if pet[1] > 0:
-        cursor.execute(
-            '''
-            UPDATE users SET food = CASE
-                WHEN (SELECT food FROM pet WHERE uuid=?) = ? THEN food
-                ELSE food - 1
-            END WHERE id=?
-            ''', (str(pet[2]), str(pet[9]), user_id)
-        )
-        cursor.execute(
-            '''
-            UPDATE pet
-            SET food = CASE 
-                WHEN food + 1 > max_food THEN food
-                ELSE food + 1
-            END WHERE uuid=?
-            ''', (str(pet[2]), ))
-        cursor.connection.commit()
+def feed_pet(user_id: int, pet: list) -> None:
+    cursor.execute(
+        '''
+        UPDATE users SET food = food - 1 WHERE id=?
+        ''', (user_id, )
+    )
+    cursor.execute(
+        '''
+        UPDATE pet SET food = food + 1 WHERE uuid=?
+        ''', (pet[5], )
+    )
+    cursor.connection.commit()
 
 
 def add_coins(user_id: int, coins: int = 1) -> None:
@@ -63,7 +58,7 @@ def get_pet_info(user_id: int) -> list:
     return cursor.execute('SELECT * FROM users LEFT JOIN pet ON users.pet = pet.uuid WHERE id=?', (user_id, )).fetchone()
 
 
-def give_admin_status(user_id: int) -> None:
+def give_admin_permissions(user_id: int) -> None:
     cursor.execute('UPDATE users SET is_admin=? WHERE id=?', (True, user_id))
     cursor.connection.commit()
 
