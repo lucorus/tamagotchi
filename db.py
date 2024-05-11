@@ -1,10 +1,15 @@
-import sqlite3
+import psycopg2
+import config
 
 
 try:
-    connection = sqlite3.connect('files.db', check_same_thread=False)
-
+    connection = psycopg2.connect(
+        password=config.db_password,
+        database=config.db_name,
+        user=config.db_user
+    )
     cursor = connection.cursor()
+    connection.autocommit = True
 
     cursor.execute(
         '''

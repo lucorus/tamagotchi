@@ -13,7 +13,7 @@ from base import game_data
 @dp.message(Command('admin_panel'))
 async def admin_panel(message: Message):
     builder = InlineKeyboardBuilder()
-    if base.is_admin(message.from_user.id):
+    if await base.is_admin(message.from_user.id):
         builder.row(types.InlineKeyboardButton(
             text=emojize("Отправить сообщение:pencil:"),
             callback_data="send_public_message")
@@ -31,18 +31,19 @@ async def admin_panel(message: Message):
 
 @dp.message(Command('get_admin_permissions'))
 async def get_admin_permissions(message: Message):
-    if message.text.split()[1] == config.password:
-        base.give_admin_permissions(message.from_user.id)
-        await message.answer('Права администратора получены!')
-        await message.delete()
-    else:
-        print(message.text.split()[1], config.password, sep='\n')
+    try:
+        if message.text.split()[1] == config.password:
+            await base.give_admin_permissions(message.from_user.id)
+            await message.answer('Права администратора получены!')
+            await message.delete()
+    except Exception as ex:
+        print(ex)
 
 
 @dp.callback_query(F.data == 'admin_list')
 async def admin_list(callback: CallbackQuery):
     await callback.message.delete()
-    admins = base.get_admins()
+    admins = await base.get_admins()
     adm_list = ['Администраторы:']
     for item in admins:
         user = dict(await base.bot.get_chat(item[0]))
@@ -59,8 +60,8 @@ async def admin_list(callback: CallbackQuery):
 @dp.message(Command('delete_admin'))
 async def delete_admin(message: Message):
     try:
-        if base.is_admin(message.from_user.id):
-            base.delete_admin(int(message.text.split()[1]))
+        if await base.is_admin(message.from_user.id):
+            await base.delete_admin(int(message.text.split()[1]))
             await message.answer(emojize(f'Администратор с id = { message.text.split()[1] } был разжалован:anxious_face_with_sweat:'))
             await base.bot.send_message(chat_id=message.text.split()[1],
                                         text=emojize('Вы были разжалованы с роли администратора:pensive_face:')

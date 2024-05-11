@@ -58,8 +58,8 @@ async def guess_number(message: Message):
 
     if user_number == guessed_number:
         await message.answer(emojize("Поздравляю! Ты угадал число"))
-        base.add_coins(message.from_user.id, 2)
-        base.add_mood(message.from_user.id, 5)
+        await base.add_coins(message.from_user.id, 2)
+        await base.add_mood(message.from_user.id, 5)
         game_data.pop(message.from_user.id)
     elif user_number < guessed_number:
         await message.answer(emojize("Загаданное число больше :up_arrow:"))
@@ -73,8 +73,8 @@ async def game_towns(message: types.Message):
         if game_data[message.from_user.id][1][-1] == message.text[0].lower() and message.text.capitalize() in towns \
                 and message.text != game_data[message.from_user.id]:
             await message.answer('Правильный ответ')
-            base.add_coins(message.from_user.id, 2)
-            base.add_mood(message.from_user.id, 5)
+            await base.add_coins(message.from_user.id, 2)
+            await base.add_mood(message.from_user.id, 5)
         else:
             await message.answer(
                 emojize('Неправильный ответ, вы проиграли :index_pointing_at_the_viewer::face_with_tears_of_joy:')

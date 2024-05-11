@@ -23,8 +23,9 @@ async def buy_food(callback: CallbackQuery):
     await callback.message.delete()
     try:
         food_price = 2
-        if base.get_pet_info(callback.from_user.id)[4] >= food_price:
-            base.buy_food(callback.from_user.id, food_price)
+        pet_info = await base.get_pet_info(callback.from_user.id)
+        if pet_info[4] >= food_price:
+            await base.buy_food(callback.from_user.id, food_price)
             await callback.message.answer('Корм успешно куплен')
         else:
             await callback.message.answer('У вас недостаточно 🪙')

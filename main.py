@@ -5,7 +5,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from emoji import emojize
-from base import dp, bot, cursor
+from base import dp, bot
 from aiogram import types, F
 import games as game
 import admin, base, pet, assortment
@@ -13,26 +13,35 @@ import admin, base, pet, assortment
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
-    cursor.execute('INSERT OR IGNORE INTO users (id) VALUES(?)', (message.from_user.id,))
-    cursor.connection.commit()
-    builder = InlineKeyboardBuilder().add(types.InlineKeyboardButton(
-        text="Создать питомца",
-        callback_data="create_pet")
-    )
-    await message.answer(f"Привет, { message.from_user.full_name }!", reply_markup=builder.as_markup())
+    try:
+        if await base.get_user(message.from_user.id) == []:
+            await base.create_user(message.from_user.id)
+        builder = InlineKeyboardBuilder().add(types.InlineKeyboardButton(
+            text="Создать питомца",
+            callback_data="create_pet")
+        )
+        await message.answer(f"Привет, {message.from_user.full_name}!", reply_markup=builder.as_markup())
+    except Exception as ex:
+        print(ex)
+
+
+@dp.message(Command('users'))
+async def users(message: Message):
+    users = await base.get_users()
+    await message.answer(f'{ [item for item in users] }')
 
 
 async def send_message(user_id: list) -> None:
     for item in user_id:
-        await bot.send_message(chat_id=item[0], text=emojize('Ваш питомец погиб:anxious_face_with_sweat:'))
-        base.delete_pet(item[0])
+        await bot.send_message(chat_id=int(item[0]), text=emojize('Ваш питомец погиб:anxious_face_with_sweat:'))
+        await base.delete_pet(int(item[0]))
 
 
 # функция, которая раз в 4 часа уменьшает сытость и настроение питомцев
 async def change_count_food_and_mood():
     while True:
-        base.change_count_food_and_mood()
-        users = base.check_pet_stats()
+        await base.change_count_food_and_mood()
+        users = await base.check_pet_stats()
         await send_message(users)
         await asyncio.sleep(60 * 60 * 4)
 
