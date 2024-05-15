@@ -19,10 +19,6 @@ async def admin_panel(message: Message):
             callback_data="send_public_message")
         )
         builder.row(types.InlineKeyboardButton(
-            text=emojize("Добавить новый предмет:plus:"),
-            callback_data="add_new_item")
-        )
-        builder.row(types.InlineKeyboardButton(
             text=emojize("Список администраторов:bookmark_tabs:"),
             callback_data="admin_list")
         )

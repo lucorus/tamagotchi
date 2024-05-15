@@ -130,3 +130,14 @@ async def get_users() -> list:
     conn = await create_connect()
     users = await conn.fetch('SELECT * FROM users')
     return users[0]
+
+
+async def upgrade_stats(user_id: int, price: int, stat: str):
+    pet_info = await get_pet_info(user_id)
+    conn = await create_connect()
+    if stat == 'food':
+        improvement_points = 1
+    else:
+        improvement_points = 10
+    await conn.execute(f'UPDATE pet SET max_{stat} = max_{stat} + {improvement_points} WHERE uuid = $1', pet_info[5])
+    await conn.execute(f'UPDATE users SET coins = coins - {price} WHERE id=$1', user_id)
