@@ -1,13 +1,15 @@
 from aiogram import types, F
 from aiogram.enums import ContentType
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from emoji import emojize
 import config
 import base
+import main
+import states
 from base import dp
-from base import game_data
 
 
 @dp.message(Command('admin_panel'))
@@ -70,26 +72,36 @@ async def delete_admin(message: Message):
 
 
 @dp.callback_query(F.data == 'send_public_message')
-async def pre_send_public_message(callback: CallbackQuery):
-    await callback.message.delete()
-    game_data[callback.from_user.id] = ['send_message']
-    await callback.message.answer('Введите текст сообщения, которое вы хотите отправить')
+async def pre_send_public_message(callback: CallbackQuery, state: FSMContext):
+    try:
+        await callback.message.delete()
+        await state.set_state(states.SendPublicMessage.message_content)
+        await callback.message.answer('Введите текст сообщения, которое вы хотите отправить')
+    except Exception as ex:
+        print(ex)
+        await callback.message.answer('Произошла неизвестная ошибка')
 
 
 # отправляет сообщение всем пользователям с текстом, написанным админом
-async def send_public_message(message: Message):
-    game_data.pop(message.from_user.id)
-    if message.media_group_id != None:
-        await message.answer('Групповые медиа не поддерживаются')
-        return
-    match message.content_type:
-        case ContentType.PHOTO:
-            await message.answer_photo(photo=message.photo[0].file_id, caption=message.md_text, parse_mode='MARKDOWN')
-        case ContentType.DOCUMENT:
-            await message.answer_document(document=message.document.file_id, caption=message.md_text, parse_mode='MARKDOWN')
-        case ContentType.AUDIO:
-            await message.answer_audio(audio=message.audio.file_id, caption=message.md_text, parse_mode='MARKDOWN')
-        case ContentType.VOICE:
-            await message.answer_voice(voice=message.voice.file_id, caption=message.md_text, parse_mode='MARKDOWN')
-        case ContentType.TEXT:
-            await message.answer(text=message.md_text, parse_mode='MARKDOWN')
+@dp.message(states.SendPublicMessage.message_content)
+async def send_public_message(message: Message, state: FSMContext):
+    try:
+        await state.clear()
+        if message.media_group_id != None:
+            await message.answer('Групповые медиа не поддерживаются')
+            return
+        user_id = await base.get_users_id()
+        match message.content_type:
+            case ContentType.PHOTO:
+                await main.send_messages(user_id=user_id, content_type='photo', md_text=message.md_text, photo=message.photo[0].file_id)
+            case ContentType.DOCUMENT:
+                await main.send_messages(user_id=user_id, content_type='document', md_text=message.md_text, document=message.document.file_id)
+            case ContentType.AUDIO:
+                await main.send_messages(user_id=user_id, content_type='audio', md_text=message.md_text, audio=message.audio.file_id)
+            case ContentType.VOICE:
+                await main.send_messages(user_id=user_id, content_type='voice', md_text=message.md_text, voice=message.voice.file_id)
+            case ContentType.TEXT:
+                await main.send_messages(user_id=user_id, content_type='text', md_text=message.md_text)
+    except Exception as ex:
+        print(ex)
+

@@ -1,4 +1,5 @@
 from aiogram import F
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from base import dp, bot
@@ -6,6 +7,7 @@ from aiogram.types import Message
 from aiogram import types
 from emoji import emojize
 from base import game_data
+import states
 import random
 import base
 
@@ -32,23 +34,28 @@ async def get_games(callback: CallbackQuery):
 
 
 @dp.callback_query(F.data == "guess_number")
-async def start_game_guess_number(callback: CallbackQuery):
-    game_data[callback.from_user.id] = ['guess_number', random.randint(1, 100)]
+async def start_game_guess_number(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(states.GuessNumber.number)
+    await state.set_data({'guessed_number': random.randint(1, 100)})
     await callback.message.answer(f"Я загадал число от 1 до 100, попробуй угадать его.")
     await bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
 
 @dp.callback_query(F.data == "towns")
-async def start_game_towns(callback: CallbackQuery):
-    game_data[callback.from_user.id] = ['towns', random.choice(towns)]
-    await callback.message.answer(f"Я загадал город, его название - { game_data[callback.from_user.id][1] }."
+async def start_game_towns(callback: CallbackQuery, state: FSMContext):
+    guessed_town = random.choice(towns)
+    await state.set_data({'guessed_town': guessed_town})
+    await state.set_state(states.Towns.town_title)
+    await callback.message.answer(f"Я загадал город, его название - { guessed_town }."
                          f"\n Ваша задача - назвать российский город на последнюю букву")
     await bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
 
-# обработка ответов для игры угадай число
-async def guess_number(message: Message):
-    guessed_number = game_data[message.from_user.id][1]
+# обработка ответов для игры "угадай число"
+@dp.message(states.GuessNumber.number)
+async def guess_number(message: Message, state: FSMContext):
+    guessed_number = await state.get_data()
+    guessed_number = guessed_number['guessed_number']
 
     try:
         user_number = int(message.text)
@@ -58,9 +65,9 @@ async def guess_number(message: Message):
 
     if user_number == guessed_number:
         await message.answer(emojize("Поздравляю! Ты угадал число"))
+        await state.clear()
         await base.add_coins(message.from_user.id, 2)
         await base.add_mood(message.from_user.id, 5)
-        game_data.pop(message.from_user.id)
     elif user_number < guessed_number:
         await message.answer(emojize("Загаданное число больше :up_arrow:"))
     else:
@@ -68,10 +75,13 @@ async def guess_number(message: Message):
 
 
 # обработка ответов для игры в города
-async def game_towns(message: types.Message):
+@dp.message(states.Towns.town_title)
+async def game_towns(message: types.Message, state: FSMContext):
     try:
-        if game_data[message.from_user.id][1][-1] == message.text[0].lower() and message.text.capitalize() in towns \
-                and message.text != game_data[message.from_user.id]:
+        guessed_town = await state.get_data()
+        guessed_town = guessed_town['guessed_town']
+
+        if guessed_town[-1] == message.text[0].lower() and message.text.capitalize() != guessed_town and message.text.capitalize() in towns:
             await message.answer('Правильный ответ')
             await base.add_coins(message.from_user.id, 2)
             await base.add_mood(message.from_user.id, 5)
@@ -79,7 +89,6 @@ async def game_towns(message: types.Message):
             await message.answer(
                 emojize('Неправильный ответ, вы проиграли :index_pointing_at_the_viewer::face_with_tears_of_joy:')
             )
+        await state.clear()
     except Exception as ex:
         print(ex)
-    finally:
-        game_data.pop(message.from_user.id)

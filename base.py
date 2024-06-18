@@ -1,5 +1,6 @@
 import uuid
 import psycopg2
+from aiogram.fsm.storage.memory import MemoryStorage
 import config
 import asyncpg
 from aiogram import Bot, Dispatcher
@@ -8,7 +9,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 # Словарь, который хранит данные о всех активных действиях пользователей
 # {user_id: ['название_действия', данные, которые нужны для данного действия/ничего], }
 game_data = dict()
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 global bot
 # connection = sqlite3.connect('files.db', check_same_thread=True)
 # cursor = connection.cursor()
@@ -126,9 +127,17 @@ async def delete_pet(user_id: int) -> None:
     await conn.execute('DELETE FROM pet WHERE uuid = (SELECT pet FROM users WHERE id = $1);', user_id)
 
 
+# получаем данные всех пользователей
 async def get_users() -> list:
     conn = await create_connect()
     users = await conn.fetch('SELECT * FROM users')
+    return users[0]
+
+
+# получаем список из id всех пользователей
+async def get_users_id() -> list:
+    conn = await create_connect()
+    users = await conn.fetch('SELECT id FROM users')
     return users[0]
 
 

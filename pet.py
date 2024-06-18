@@ -1,26 +1,29 @@
 from aiogram import F
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from base import dp, bot
 from aiogram.types import Message
 from aiogram import types
 from emoji import emojize
-import base
+import base, states
 import games as game
 
 
 @dp.callback_query(F.data == 'create_pet')
-async def pre_create_pet(callback: CallbackQuery):
-    game.game_data[callback.from_user.id] = ['create_pet']
+async def pre_create_pet(callback: CallbackQuery, state: FSMContext):
+    #game.game_data[callback.from_user.id] = ['create_pet']
+    await state.set_state(states.CreatePet.name)
     await callback.message.answer('Введите имя для вашего питомца')
 
 
-async def create_pet(message: Message):
+@dp.message(states.CreatePet.name)
+async def create_pet(message: Message, state: FSMContext):
     try:
         name = message.text.split()[0].replace('/', '').capitalize()
         await base.create_pet(message.from_user.id, name)
-        game.game_data.pop(message.from_user.id)
+        await state.clear()
         await message.answer(f'Питомец с именем {name} создан')
     except Exception as ex:
         print(ex)
